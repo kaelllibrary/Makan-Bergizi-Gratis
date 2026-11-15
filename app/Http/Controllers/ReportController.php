@@ -22,7 +22,19 @@ use Illuminate\View\View;
 
 class ReportController extends Controller
 {
-    /**
+        private function writeCsvRow($output, array $row): void
+    {
+        $sanitized = array_map(function ($cell) {
+            if (is_string($cell) && $cell !== '' && in_array($cell[0], ['=', '+', '-', '@'], true)) {
+                return "'" . $cell;
+            }
+
+            return $cell;
+        }, $row);
+
+        fputcsv($output, $sanitized);
+    }
+        /**
      * Halaman Utama Pusat Laporan & Cetak Rekapitulasi Operasional MBG (Dedicated Page)
      */
     public function index(Request $request): View
@@ -217,18 +229,18 @@ class ReportController extends Controller
 
     private function generateDailyOperationalCsv($output, Carbon $date): void
     {
-        fputcsv($output, ['SATUAN PELAYANAN PEMENUHAN GIZI (SPPG) SUNGAI SELAYUR 1 - KECAMATAN KALIDONI']);
-        fputcsv($output, ['LAPORAN HARIAN OPERASIONAL PROGRAM MAKAN BERGIZI GRATIS (MBG)']);
-        fputcsv($output, ['Tanggal Operasional', $date->translatedFormat('d F Y')]);
-        fputcsv($output, ['Total Kuota Penerima Manfaat', '1.414 Porsi (5 Sekolah & 2 Posyandu)']);
-        fputcsv($output, ['Relawan Dapur Bertugas', '35 Relawan']);
-        fputcsv($output, []);
+        $this->writeCsvRow($output, ['SATUAN PELAYANAN PEMENUHAN GIZI (SPPG) SUNGAI SELAYUR 1 - KECAMATAN KALIDONI']);
+        $this->writeCsvRow($output, ['LAPORAN HARIAN OPERASIONAL PROGRAM MAKAN BERGIZI GRATIS (MBG)']);
+        $this->writeCsvRow($output, ['Tanggal Operasional', $date->translatedFormat('d F Y')]);
+        $this->writeCsvRow($output, ['Total Kuota Penerima Manfaat', '1.414 Porsi (5 Sekolah & 2 Posyandu)']);
+        $this->writeCsvRow($output, ['Relawan Dapur Bertugas', '35 Relawan']);
+        $this->writeCsvRow($output, []);
 
         $menu = DailyMenu::with(['nutritionist', 'headOfKitchen', 'accountant'])->whereDate('operational_date', $date)->first();
         if ($menu) {
-            fputcsv($output, ['=== 1. PERENCANAAN MENU & VALIDASI PAGU ===']);
-            fputcsv($output, ['Kode Menu', 'Nama Menu', 'Kategori', 'Target Porsi', 'Estimasi Biaya/Porsi', 'Status PAGU', 'Status Approval']);
-            fputcsv($output, [
+            $this->writeCsvRow($output, ['=== 1. PERENCANAAN MENU & VALIDASI PAGU ===']);
+            $this->writeCsvRow($output, ['Kode Menu', 'Nama Menu', 'Kategori', 'Target Porsi', 'Estimasi Biaya/Porsi', 'Status PAGU', 'Status Approval']);
+            $this->writeCsvRow($output, [
                 $menu->menu_code,
                 $menu->menu_name,
                 strtoupper($menu->recipient_category ?? 'siswa'),
@@ -237,16 +249,16 @@ class ReportController extends Controller
                 strtoupper($menu->pagu_status ?? 'pending'),
                 strtoupper($menu->status),
             ]);
-            fputcsv($output, []);
+            $this->writeCsvRow($output, []);
         }
 
-        fputcsv($output, ['=== 2. DISTRIBUSI & KONFIRMASI PENERIMAAN 1.414 PORSI ===']);
-        fputcsv($output, ['Nomor Surat Jalan', 'Mitra Penerima', 'Tipe', 'Porsi Alokasi', 'Porsi Kirim', 'Porsi Diterima Baik', 'Selisih Porsi', 'Status Pengiriman', 'Uji Rasa', 'Suhu Tiba (°C)', 'Kelayakan Konsumsi']);
+        $this->writeCsvRow($output, ['=== 2. DISTRIBUSI & KONFIRMASI PENERIMAAN 1.414 PORSI ===']);
+        $this->writeCsvRow($output, ['Nomor Surat Jalan', 'Mitra Penerima', 'Tipe', 'Porsi Alokasi', 'Porsi Kirim', 'Porsi Diterima Baik', 'Selisih Porsi', 'Status Pengiriman', 'Uji Rasa', 'Suhu Tiba (°C)', 'Kelayakan Konsumsi']);
 
         $deliveries = Delivery::with(['institution', 'confirmation'])->latest('id')->take(20)->get();
         foreach ($deliveries as $d) {
             $c = $d->confirmation;
-            fputcsv($output, [
+            $this->writeCsvRow($output, [
                 $d->waybill_number,
                 $d->institution->name,
                 strtoupper($d->institution->type),
@@ -264,15 +276,15 @@ class ReportController extends Controller
 
     private function generateStockVarianceCsv($output): void
     {
-        fputcsv($output, ['LAPORAN PERSEDIAAN BAHAN BAKU & MUTASI GUDANG SPPG SUNGAI SELAYUR 1']);
-        fputcsv($output, []);
-        fputcsv($output, ['SKU', 'Nama Bahan Baku', 'Kategori', 'Stok Saat Ini', 'Satuan', 'Batas Minimum', 'Harga Satuan (Rp)', 'Total Valuasi (Rp)', 'Status Persediaan']);
+        $this->writeCsvRow($output, ['LAPORAN PERSEDIAAN BAHAN BAKU & MUTASI GUDANG SPPG SUNGAI SELAYUR 1']);
+        $this->writeCsvRow($output, []);
+        $this->writeCsvRow($output, ['SKU', 'Nama Bahan Baku', 'Kategori', 'Stok Saat Ini', 'Satuan', 'Batas Minimum', 'Harga Satuan (Rp)', 'Total Valuasi (Rp)', 'Status Persediaan']);
 
         $ingredients = Ingredient::orderBy('category')->orderBy('name')->get();
         foreach ($ingredients as $i) {
             $valuation = $i->current_stock * $i->unit_cost;
             $status = $i->current_stock <= $i->min_stock_threshold ? 'PERLU RESTOCK' : 'AMAN';
-            fputcsv($output, [
+            $this->writeCsvRow($output, [
                 $i->sku,
                 $i->name,
                 ucwords(str_replace('_', ' ', $i->category)),
@@ -288,13 +300,13 @@ class ReportController extends Controller
 
     private function generateQcApdCsv($output): void
     {
-        fputcsv($output, ['LAPORAN KEAMANAN PANGAN HACCP & KEPATUHAN 5 APD 35 RELAWAN DAPUR']);
-        fputcsv($output, []);
-        fputcsv($output, ['Kode Sampel Arsip', 'Tanggal Audit', 'Suhu Masak (>=75°C)', 'Suhu Holding (>=60°C)', 'Suhu Pra-Distribusi', 'Relawan Hadir', 'Skor Kepatuhan APD (%)', 'Sampel 2x24 Jam', 'Status Kelulusan', 'Tindak Lanjut']);
+        $this->writeCsvRow($output, ['LAPORAN KEAMANAN PANGAN HACCP & KEPATUHAN 5 APD 35 RELAWAN DAPUR']);
+        $this->writeCsvRow($output, []);
+        $this->writeCsvRow($output, ['Kode Sampel Arsip', 'Tanggal Audit', 'Suhu Masak (>=75°C)', 'Suhu Holding (>=60°C)', 'Suhu Pra-Distribusi', 'Relawan Hadir', 'Skor Kepatuhan APD (%)', 'Sampel 2x24 Jam', 'Status Kelulusan', 'Tindak Lanjut']);
 
         $inspections = QcInspection::with('productionRun.dailyMenu')->latest('inspected_at')->get();
         foreach ($inspections as $q) {
-            fputcsv($output, [
+            $this->writeCsvRow($output, [
                 $q->food_sample_code ?? '-',
                 $q->inspected_at->format('d/m/Y H:i'),
                 $q->cooking_core_temp_c . ' °C',
@@ -311,14 +323,14 @@ class ReportController extends Controller
 
     private function generateDistributionCsv($output): void
     {
-        fputcsv($output, ['LAPORAN PENGIRIMAN & UJI ORGANOLEPTIK MITRA SEKOLAH & POSYANDU']);
-        fputcsv($output, []);
-        fputcsv($output, ['No Surat Jalan', 'Tujuan Mitra', 'Armada', 'Porsi Kirim', 'Porsi Baik', 'Selisih', 'Jam Berangkat', 'Jam Tiba', 'Aroma', 'Rasa', 'Warna', 'Tekstur', 'Suhu (°C)', 'Catatan Lapangan']);
+        $this->writeCsvRow($output, ['LAPORAN PENGIRIMAN & UJI ORGANOLEPTIK MITRA SEKOLAH & POSYANDU']);
+        $this->writeCsvRow($output, []);
+        $this->writeCsvRow($output, ['No Surat Jalan', 'Tujuan Mitra', 'Armada', 'Porsi Kirim', 'Porsi Baik', 'Selisih', 'Jam Berangkat', 'Jam Tiba', 'Aroma', 'Rasa', 'Warna', 'Tekstur', 'Suhu (°C)', 'Catatan Lapangan']);
 
         $deliveries = Delivery::with(['institution', 'confirmation'])->latest('id')->get();
         foreach ($deliveries as $d) {
             $c = $d->confirmation;
-            fputcsv($output, [
+            $this->writeCsvRow($output, [
                 $d->waybill_number,
                 $d->institution->name,
                 $d->vehicle_plate_number ?? '-',
@@ -339,13 +351,13 @@ class ReportController extends Controller
 
     private function generateComplaintsCsv($output): void
     {
-        fputcsv($output, ['REKAPITULASI TIKET KELUHAN LAPORAN SEKOLAH & TINDAK LANJUT']);
-        fputcsv($output, []);
-        fputcsv($output, ['Nomor Tiket', 'Sekolah / Posyandu', 'Pelapor', 'Kategori Keluhan', 'Tingkat Keparahan', 'Deskripsi Masalah', 'Status', 'Ditangani Oleh', 'Tindakan Penyelesaian', 'Tanggal Selesai']);
+        $this->writeCsvRow($output, ['REKAPITULASI TIKET KELUHAN LAPORAN SEKOLAH & TINDAK LANJUT']);
+        $this->writeCsvRow($output, []);
+        $this->writeCsvRow($output, ['Nomor Tiket', 'Sekolah / Posyandu', 'Pelapor', 'Kategori Keluhan', 'Tingkat Keparahan', 'Deskripsi Masalah', 'Status', 'Ditangani Oleh', 'Tindakan Penyelesaian', 'Tanggal Selesai']);
 
         $tickets = ComplaintTicket::with(['institution', 'reporter', 'resolver'])->latest('id')->get();
         foreach ($tickets as $t) {
-            fputcsv($output, [
+            $this->writeCsvRow($output, [
                 $t->ticket_number,
                 $t->institution->name,
                 $t->reporter->name ?? 'PIC Sekolah',
@@ -816,17 +828,17 @@ class ReportController extends Controller
 
     private function generateRolePerformanceCsv($output, Carbon $date): void
     {
-        fputcsv($output, ['SATUAN PELAYANAN PEMENUHAN GIZI (SPPG) SUNGAI SELAYUR 1 - KECAMATAN KALIDONI']);
-        fputcsv($output, ['LAPORAN EVALUASI KINERJA & AKUNTABILITAS 7 PERAN PENGGUNA (ROLE PERFORMANCE REPORT)']);
-        fputcsv($output, ['Tanggal Evaluasi', $date->translatedFormat('d F Y')]);
-        fputcsv($output, ['Standar Kepatuhan', 'SOP Badan Gizi Nasional (BGN) RI']);
-        fputcsv($output, []);
-        fputcsv($output, ['No', 'Peran / Jabatan', 'Nama Personel', 'Tugas Pokok & Modul Wewenang', 'Metrik Output Real-Time', 'Indikator Kepatuhan SOP BGN', 'Status Evaluasi', 'Nilai Akuntabilitas']);
+        $this->writeCsvRow($output, ['SATUAN PELAYANAN PEMENUHAN GIZI (SPPG) SUNGAI SELAYUR 1 - KECAMATAN KALIDONI']);
+        $this->writeCsvRow($output, ['LAPORAN EVALUASI KINERJA & AKUNTABILITAS 7 PERAN PENGGUNA (ROLE PERFORMANCE REPORT)']);
+        $this->writeCsvRow($output, ['Tanggal Evaluasi', $date->translatedFormat('d F Y')]);
+        $this->writeCsvRow($output, ['Standar Kepatuhan', 'SOP Badan Gizi Nasional (BGN) RI']);
+        $this->writeCsvRow($output, []);
+        $this->writeCsvRow($output, ['No', 'Peran / Jabatan', 'Nama Personel', 'Tugas Pokok & Modul Wewenang', 'Metrik Output Real-Time', 'Indikator Kepatuhan SOP BGN', 'Status Evaluasi', 'Nilai Akuntabilitas']);
 
         $rolesData = $this->buildRolePerformanceData($date);
         $no = 1;
         foreach ($rolesData as $r) {
-            fputcsv($output, [
+            $this->writeCsvRow($output, [
                 $no++,
                 $r['role_name'],
                 $r['personnel'],

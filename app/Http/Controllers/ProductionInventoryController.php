@@ -220,7 +220,8 @@ class ProductionInventoryController extends Controller
                 default => 'ADJ',
             };
 
-            $refNo = $prefix . '/SS1/' . now()->format('Ymd/His');
+            $refNo = $prefix . '/SS1/' . now()->format('Ymd/His') . '/' . strtoupper(\Illuminate\Support\Str::random(3));
+            $supplierName = $validated['supplier_name'] ?? 'Pemasok Terdaftar SPPG Sungai Selayur 1';
 
             InventoryTransaction::create([
                 'reference_no' => $refNo,
@@ -230,7 +231,7 @@ class ProductionInventoryController extends Controller
                 'quantity' => $validated['quantity'],
                 'unit_price' => $unitPrice,
                 'total_cost' => round($validated['quantity'] * $unitPrice, 2),
-                'supplier_name' => $validated['supplier_name'] ?? 'Pemasok Terdaftar SPPG Sungai Selayur 1',
+                'supplier_name' => $supplierName,
                 'freshness_condition' => $validated['freshness_condition'],
                 'recorded_by' => Auth::id(),
                 'verified_by_accountant' => in_array(Auth::user()->role->value, ['akuntan', 'admin']) ? Auth::id() : null,
@@ -247,7 +248,7 @@ class ProductionInventoryController extends Controller
             ActivityLog::record(
                 'inventory_transaction',
                 'inventory',
-                "Mencatat transaksi {$validated['type']} {$refNo} untuk {$ingredient->name} ({$validated['quantity']} {$ingredient->unit}) dari {$validated['supplier_name']}."
+                "Mencatat transaksi {$validated['type']} {$refNo} untuk {$ingredient->name} ({$validated['quantity']} {$ingredient->unit}) dari {$supplierName}."
             );
         });
 

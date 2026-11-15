@@ -253,8 +253,12 @@ class DistributionController extends Controller
             ->with('success', 'Konfirmasi Penerimaan & Hasil Uji Organoleptik untuk ' . $delivery->institution->name . ' berhasil disimpan!');
     }
 
-    public function destroy(Delivery $delivery): RedirectResponse
+public function destroy(Delivery $delivery): RedirectResponse
     {
+        if (in_array($delivery->status, ['confirmed_clean', 'confirmed_with_issue'])) {
+            return back()->with('error', 'Surat jalan yang telah dikonfirmasi penerimaannya oleh pihak sekolah tidak dapat dihapus.');
+        }
+
         $wb = $delivery->waybill_number;
         $delivery->delete();
 

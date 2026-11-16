@@ -12,6 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class ProductionInventoryController extends Controller
@@ -222,6 +223,9 @@ class ProductionInventoryController extends Controller
 
             $refNo = $prefix . '/SS1/' . now()->format('Ymd/His') . '/' . strtoupper(\Illuminate\Support\Str::random(3));
             $supplierName = $validated['supplier_name'] ?? 'Pemasok Terdaftar SPPG Sungai Selayur 1';
+            if (empty(trim((string) $supplierName))) {
+                $supplierName = 'Pemasok Terdaftar SPPG Sungai Selayur 1';
+            }
 
             InventoryTransaction::create([
                 'reference_no' => $refNo,
